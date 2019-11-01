@@ -29,7 +29,7 @@ const createWindow = ()=>{
         win = null;
     });
     
-    win.webContents.openDevTools()
+    // win.webContents.openDevTools()
     
 }
 
