@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Control de Pendientes</title>
+    <link rel="stylesheet" href="./public/css/build.css">
+    <script src="https://code.iconify.design/1/1.0.3/iconify.min.js"></script>
+</head>
+<body class="bg-gray-300 p-0">     
+    <div class='w-full flex flex-col py-2 px-2'>
+        <div class='container cursor-default control flex flex-col select-none' >
+            <div class="flex flex-row mb-2 items-center flex">
+                <div class="w-3/4" style="height: 5vh;">
+                    <span class="font-bold text-xl">Mis Pendientes</span>
+                </div>
+                <div class="w-1/4 text-right">
+                    <a href="#" class="text-right" id='addTaskList'> 
+                        <span class="iconify text-2xl" data-icon="ic:outline-add-circle" data-inline="false"></span>
+                    </a>                    
+                </div>
+            </div>
+            <div style="height: 80vh;"  class="overflow-y-auto">
+                <div id='cardscontainer' class="overflow-x-hidden mr-2"></div>
+            </div>            
+        </div>
+        <div class="container control hidden">
+            <div class="select-none container w-5/6 mx-auto px-4 py-2 rounded-lg bg-white shadow">
+                <div class="cursor-pointer inline-block text-xl" id='goBackList'>
+                    <span class="iconify" data-icon="dashicons:arrow-left-alt" data-inline="true"></span>              
+                </div>
+                <span class="text-xl" id='taskListName'></span>
+                <form class="mt-2 mb-4" autocomplete="false" aria-keyshortcuts="none" onsubmit="return false">
+                    <div class="mb-0">
+                        <label for="" class="block text-gray-700 text-sm font-bold mb-2" for='todo'> Todo </label>
+                        <input id='inpuTodo' max="125" type="text" name="todo" id="todo" class="shadow apparence-none border rounded w-full">
+                    </div>
+                    <div class='mb-2 text-right'>
+                        <p class="text-xs text-gray-500"><span id="msjleng">0</span>/125</p>
+                    </div>
+                    <div class='flex flex-row cursor-pointer items-center bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded' id='btnAdd'>
+                        <!-- <span class="iconify mr-2" data-icon="fa:plus"></span> -->
+                        <span>Agregar</span>
+                    </div>
+                </form>
+            </div>
+            <div class="overflow-y-auto w-full px-4 mt-4" id='listcontainer' style="max-height:55vh">
+            </div>
+        </div>
+    </div>  
+    <div class='w-full flex-row absolute bottom-0 hidden' id='bottomMenu'>
+        <div class="mx-auto w-4/6 rounded-t-lg bg-gray-800 text-white px-6 pt-2 pb-1">
+            <a class="bg-white cursor-pointer text-yellow-500" id='btnDltItems'>
+                <span class="iconify" data-width='20px' data-height='20px' data-icon="fa-solid:trash-alt" data-inline="true"></span>
+            </a>
+            <!-- <div class="w-10 h-10 align-middle flex flex-col justify-center items-center text-center cursor-pointer bg-yellow-100 rounded-full text-red-500">                
+                <span class="iconify" data-width='20px' data-height='20px' data-icon="fa-solid:trash-alt" data-inline="true"></span>
+            </div> -->
+        </div>
+    </div>
+</body>
+<script src='./public/js/geDOM.js'></script>
+<script src="./public/js/transition.js"></script>
+<script>
+    (function(w, $){        
+    let activeList,
+        activeIndex,
+        menuDisplay=false,
+        menuSelected = 0;
+    const        
+        {ipcRenderer} = require('electron'),
+        CONST = require('./backend/constants')
+
+        ipcRenderer.on(CONST.SET_TASK_LIST, (e, taskList)=>{
+            var fragment = document.createDocumentFragment(),
+                    container = document.querySelector("#cardscontainer");
+            taskList.forEach((todoListItem, index)=>{
+                var item = drawTaskListItem(todoListItem, index);
+                fragment.appendChild(item);
+            });
+            container.innerHTML = "";
+            container.appendChild(fragment);
+        });
+
+        ipcRenderer.on(CONST.ADD_TASK_LIST_ITEM, (e, newTask)=>{
+            var item = drawTaskListItem(newTask);
+                document.querySelector("#cardscontainer").appendChild(item);              
+        })
+
+        ipcRenderer.on(CONST.REMOVE_TASK_LIST_ITEM, (e, toRemove)=>{
+            var item = document.querySelector("#cardscontainer>div[data-index='"+toRemove+"']");            
+            transition.begin(item,[
+                "transform scale(1) scale(1,.1) .45s",
+                "opacity 1 .5 .45s"
+            ],{
+                onTransitionEnd:()=>{ item.remove(); }
+            });
+        })
+
+        ipcRenderer.on(CONST.UPDATE_TASK_LIST_ITEM, (e, updTask)=>{
+            var nvoItem = drawTaskListItem(updTask),
+                item = document.querySelector("#cardscontainer>div[data-index='"+updTask._id+"']");
+            item.parentElement.replaceChild(nvoItem, item);
+        });       
+
+        ipcRenderer.on(CONST.ERROR, (e, args)=>{
+            alert("ocurrió un error, es necesario revisar :v");
+        });
+
+        ipcRenderer.on(CONST.ADD_TODO_TASK_ITEM,(e, args)=>{
+            var nvoTodo = drawTaskTodoItem(args.todo);
+                document.querySelector("#listcontainer>ul").appendChild(nvoTodo);
+            activeList.tasks.push(args.todo);
+        })
+
+        ipcRenderer.on(CONST.REMOVE_TODO_TASK_ITEM, (e, args)=>{
+            var element = document.querySelector(`#listcontainer>ul li[data-id='${args.key}']`);
+            transition.begin(element,[
+                "transform scale(1) scale(0) .45s"
+            ],{
+                onTransitionEnd:()=>{
+                    element.remove();                    
+                }
+            })
+        })
+
+        ipcRenderer.on(CONST.UPDATE_TODO_TASK_ITEM, (e, args)=>{
+            var nvoTask = drawTaskTodoItem(args.todo),
+            elmnt = document.querySelector(`#listcontainer>ul li[data-id='${args.key}']`);
+            elmnt.parentElement.replaceChild(nvoTask, elmnt);
+        })
+
+    //Eventos de la lista de pendientes
+    function handleOnTaskMouseDown(evt){
+        var taskItem = evt.target;
+            taskItem.pressMenu = setTimeout(()=>{                            
+                taskItem.longPress = true;                                 
+                taskItem.classList.add("bg-red-200");
+            },1500);
+    }
+
+    function handleOnTaskClick(item, evt){
+        var element = evt.target;
+        if((menuDisplay && evt.ctrlKey) || element.longPress){
+            var isActive = element.classList.contains("active");
+            if(element.longPress){
+                delete element.longPress;
+            }
+            if(isActive){
+                element.classList.remove("bg-red-200", "active")
+                menuSelected--;
+            }else{                                
+                element.classList.add("bg-red-200", "active")
+                menuSelected++;
+            }                            
+            menuDisplay = menuSelected>0;                
+            toogleHiddenMenu();
+            evt.stopPropagation();
+            evt.preventDefault();
+        }
+    }
+
+    function handleOnTaskTitleClick(evt){
+        var elmnt = evt.target;
+        evt.stopPropagation();
+        if(elmnt.preclick){
+            clearTimeout(elmnt.preclick);
+            delete elmnt.preclick;
+            return;
+        }else if(!elmnt.hasAttribute("contentEditable")){
+            elmnt.preclick = setTimeout(()=>{
+                elmnt.actualTitle = elmnt.innerText.trim();
+                elmnt.removeAttribute("contentEditable");
+                delete elmnt.preclick;
+            }, 650);
+            elmnt.setAttribute("contentEditable",true);                                
+        }
+    }
+
+    function handleOnTaskTitleBlur(item,elmnt){
+        elmnt.removeAttribute("contentEditable");
+        var name = (elmnt.innerText.trim() || "Vacio");
+        elmnt.innerText = elmnt.actualTitle;
+        ipcRenderer.send(CONST.UPDATE_TASK_LIST_ITEM,{
+            attrs:{name},
+            _id:item._id
+        });
+        delete elmnt.timeout
+        delete elmnt.actualTitle;
+    }
+
+    function handleOnTaskTitleInput(evt){
+        elmnt = evt.target;
+        if(/<|>|\n|\s{2,}/gim.test(elmnt.innerText)){
+            elmnt.innerText = elmnt.innerText.replace(/<|>|\n|\s{2,}/gim,"")                                    
+        }else if(evt.keyCode == 13){
+            elmnt.removeAttribute("contentEditable");
+            elmnt.innerText = elmnt.innerText.trim();
+        }
+    }
+
+    function handleOnTaskDetailsClick(item, evt){
+        evt.stopPropagation();
+        toogleViewTaskTodo();
+        activeList = item;            
+        document.querySelector("#taskListName").innerText = item.name;
+        drawTaskTodos(item)
+    }
+
+    function handleOnTodoClick(_key, evt){
+        var shanguiable = activeList.tasks.filter(item=> item._key == _key)[0];
+        shanguiable.finished = !shanguiable.finished;
+        ipcRenderer.send(CONST.UPDATE_TODO_TASK_ITEM,{
+            _id:activeList._id,
+            todo:shanguiable
+        });       
+    }
+
+    function handleOnTodoTrashClick(todo, evt){            
+        evt.preventDefault();
+        evt.stopPropagation();
+        ipcRenderer.send(CONST.REMOVE_TODO_TASK_ITEM,{
+            _id:activeList._id,
+            todo
+        });
+    }
+
+    function handleOnReadyApp() {
+        ipcRenderer.send(CONST.READY);            
+    }
+
+
+    function toogleHiddenMenu(){
+        var element = document.querySelector("#bottomMenu"),
+            hasHidden = element.classList.contains("hidden");
+        if(menuDisplay && hasHidden || !menuDisplay && !hasHidden){
+            transition.begin(element,[
+                "transform "+(menuDisplay? "scale(0) scale(1)":"scale(1) scale(0)")+" .45s",
+                "opacity "+(menuDisplay? "0 1":"1 0")+" .45s"
+            ],{
+                onBeforeChangeStyle:(element)=>{
+                    element.classList.toggle("hidden",!menuDisplay)
+                }                
+            });            
+        }
+    }
+
+    function toogleViewTaskTodo(){
+        var visible = document.querySelector(".container.control:not(.hidden)"),
+            hidden = document.querySelector(".container.control.hidden");
+        transition.begin(visible,[
+            "opacity 1 0 .15s",                
+            "transform scale(1) scale(0) .15s",                
+        ],{onTransitionEnd:(elmnt)=>{
+            elmnt.classList.add("hidden") 
+            transition.begin(hidden,["opacity 0 1 .35s","transform scale(0) scale(1) .35s"],{
+                onBeforeChangeStyle:(elmnt)=>{ elmnt.classList.remove("hidden") }
+            })
+        }});
+    }
+
+    
+    function addTaskList(){
+        ipcRenderer.send(CONST.ADD_TASK_LIST_ITEM);                    
+    }
+
+    function deleteTaskListItems(){
+        if(menuSelected>0 && menuDisplay){
+            document.querySelectorAll("#cardscontainer>div").forEach((item, index)=>{
+                if(item.classList.contains('active')){
+                    ipcRenderer.send(CONST.REMOVE_TASK_LIST_ITEM,{
+                        _id:item.dataset.index,
+                        index
+                    });
+                }
+            });                
+            menuSelected = 0;
+            menuDisplay = false;
+            toogleHiddenMenu();
+        }
+    }
+
+    // function updateTaskList(todos){
+    //     w.localStorage.setItem(STORAGE, JSON.stringify(todos));            
+    // }
+
+
+    
+    //DIBUJO DE ELEMENTOS
+    function drawTaskListFull(taskList) {
+        var fragment = document.createDocumentFragment(),
+            container = document.querySelector("#cardscontainer");
+        taskList.forEach((todoListItem, index)=>{
+            var item = drawTaskListItem(todoListItem, index);
+            fragment.append(item);
+        });
+        container.innerHTML = "";
+        container.appendChild(fragment);
+    }      
+
+    function drawTaskListItem(item) {
+        return geDom.draw({
+            tag:"div",
+            attrs:{"data-index":`${item._id}`},
+            class:"mb-2 flex flex-col sm:w-full md:w-2/4 rounded-sm bg-white shadow px-4 py-1",
+            evt:[
+                {trigger:"mousedown","action":handleOnTaskMouseDown},
+                {trigger:"mouseup","action": evt =>clearTimeout(evt.target.pressMenu) },
+                {trigger:"click", "action":evt=> handleOnTaskClick(item,evt)}
+            ],
+            content:[
+                {tag:"span", class:"", content:(item.name || "Nueva Lista"),
+                    evt:[
+                        {trigger:"click","action":handleOnTaskTitleClick},
+                        {trigger:"blur", "action":evt=>handleOnTaskTitleBlur(item, evt.target) },
+                        {trigger:"input","action":evt=>handleOnTaskTitleInput(evt) }
+                    ]                       
+                },
+                {tag:"a",attrs:{href:"#"},class:"self-end details",
+                    content:{
+                        tag:"span",attrs:{"data-icon":"dashicons:arrow-right"},class:"iconify text-lg"
+                    },
+                    evt:{trigger:"click", "action":evt=>{handleOnTaskDetailsClick(item, evt)} }
+                }
+            ]
+        });
+    }
+
+    function drawTaskTodoItem(todo){
+        return geDom.draw({
+            tag:"li",
+            attrs:{"data-id":todo._key},
+            content:{
+                tag:"label",
+                class:`font-bold ${todo.finished && 'line-through text-teal-600'}`,
+                content:{
+                    tag:"div",
+                    class:"flex flex-row items-center",
+                    content:[
+                        {tag:"input", 
+                            class:`leading.tight mr-2`, 
+                            attrs:{type:"checkbox", checked:todo.finished}, 
+                            evt:{trigger:"click","action":evt => handleOnTodoClick(todo._key, evt)}
+                        },
+                        {tag:"span",class:'flex-shrink',style:{"width":"88%","max-width":"88%","word-wrap":"break-word" }, content:todo.task},
+                        {tag:"div",class:"inline-block ml-2 cursor-pointer",
+                            evt:{ trigger:"click", action: evt => handleOnTodoTrashClick(todo, evt) },
+                            content:{
+                                tag:"span",
+                                attrs:{
+                                    "data-icon":"fa-solid:trash-alt",
+                                    "data-inline":"false",
+                                    "data-width":"10px",
+                                    "data-height":"10px"
+                                }, 
+                                class:'iconify text-red-300 hover:text-red-500'
+                            }
+                        }
+                    ]
+                }
+            }
+        });
+    }
+
+    function drawTaskTodos(taskItem){
+        var container = document.querySelector("#listcontainer"),
+            list = document.createElement("ul"),
+            frag = document.createDocumentFragment();
+        list.classList.add("todos","list-inside","items-left");
+        frag.appendChild(list);
+        taskItem.tasks.forEach((todo, index)=>{              
+            list.appendChild( drawTaskTodoItem(todo) )
+        });            
+        container.innerHTML = "";
+        container.appendChild(frag);
+    }
+    
+    // DRAW TODOS ADATA   
+    function addTaskTodo(task){
+        if(task){
+            var todo = {
+                "_key":(Math.random().toString(16).slice(-8)),
+                "task":task,
+                "stamp":(+new Date()),
+                "finished":false
+            }
+            ipcRenderer.send(CONST.ADD_TODO_TASK_ITEM,{_id:activeList._id, todo});            
+        }
+    }
+   
+    function deleteTaskTodo(index){
+        activeList.tasks.splice(index, 1)
+        todos[activeIndex] =  activeList;
+    }
+
+
+    document.querySelector("#addTaskList").addEventListener("click",addTaskList);
+
+    document.querySelector("#inpuTodo").addEventListener("keydown",(evt)=>{
+        var input = evt.target;
+        if(evt.keyCode ===13 && input.value != ""){
+            addTaskTodo(input.value);
+            input.value = "";
+        }
+    });
+ 
+    document.querySelector("#inpuTodo").addEventListener("input", (evt)=>{
+        document.querySelector("#msjleng").innerText = evt.target.value.length;
+    });
+
+    document.querySelector("#btnAdd").addEventListener("click", function(evt){
+        var input = this.previousElementSibling.previousElementSibling.querySelector("input"),
+            todo = input.value;
+        addTaskTodo(todo);
+        input.value = "";
+    });
+    
+    document.querySelector("body").addEventListener("click",function(evt){
+        if(menuDisplay && !evt.ctrlKey){
+            this.querySelectorAll("#cardscontainer>div.bg-red-200").forEach((item)=>{
+                item.classList.remove("bg-red-200","active");                
+            });
+            menuDisplay = false;            
+            menuSelected = 0;
+            toogleHiddenMenu();
+        }
+    })
+    
+    document.querySelector("#goBackList").addEventListener("click",function(){
+        activeList = null;
+        activeIndex = null;
+        toogleViewTaskTodo();
+    })
+    
+    document.querySelector("#btnDltItems").addEventListener("click",function(evt){
+        evt.preventDefault();
+        evt.stopPropagation();
+        (!activeList && deleteTaskListItems() ) || (activeList && deleteTaskTodo());
+        
+    })
+    
+    handleOnReadyApp();
+})( self, require("jquery"))
+</script>
+</html>

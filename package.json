@@ -1,0 +1,48 @@
+{
+  "name": "todocm",
+  "version": "1.0.1",
+  "author": "José Luis <joseluisanchezr@gmail.com>",
+  "description": "para llevar seguimiento interno de tareas xD",
+  "main": "main.js",
+  "homepage": "./",
+  "scripts": {
+    "app": "electron ./main.js",
+    "test": "echo \"Error: no test specified\" && exit 1",    
+    "build":"electron-builder build --win --publish never",
+    "deploy":"electron-builder build --win --publish always"
+  },
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/LSanchez697/electrontodo.git"
+  },
+  "build": {
+    "appId": "com.cmn.todo",
+    "productName": "Pendiente-CM",
+    "icon": "./build/cm.ico",
+    "files": [
+      "./backend/*/*",
+      "./build/*",
+      "./main.js",
+      "./index.html",
+      "./public/css/build.css",
+      "./public/js/geDOM.js",
+      "./public/js/transition.js"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  },
+  "keywords": [
+    "todo"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "jquery": "^3.4.1",
+    "nedb": "^1.8.0",
+    "redux": "^4.0.4",
+    "tailwindcss": "^1.1.3"
+  },
+  "devDependencies": {
+    "electron-prebuilt": "^1.4.13"
+  }
+}
