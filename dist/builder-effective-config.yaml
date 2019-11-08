@@ -1,0 +1,18 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.cmn.todo
+productName: Pendiente-CM
+icon: ./build/cm.ico
+files:
+  - filter:
+      - ./backend/*/*
+      - ./build/*
+      - ./main.js
+      - ./index.html
+      - ./public/css/build.css
+      - ./public/js/geDOM.js
+      - ./public/js/transition.js
+win:
+  target: nsis
+electronVersion: 1.4.13
