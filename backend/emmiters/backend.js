@@ -68,13 +68,16 @@ ipcMain.on(CONST.ADD_TODO_TASK_ITEM, (evt, args)=>{
     var item = actions.getItem(_id);
     if(item){
         tasks = item.tasks.concat([todo]);
-        actions.prepareUpdateTask({_id},{tasks})        
+        var finished = 0;
+        tasks.filter((item)=>{return item.finished}).length;
+        actions.prepareUpdateTask({_id},{tasks, finished, completed:(finished == completed.length)})        
             .then(function(updated){
                 if(!updated){
                     throw updated
                 }
                 actions.updateTaskList(_id,{tasks})
-                evt.sender.send(CONST.ADD_TODO_TASK_ITEM,{todo});
+                var item = actions.getItem(_id);
+                evt.sender.send(CONST.ADD_TODO_TASK_ITEM,{todo, item});
             })
             .catch((err)=>{
                 evt.sender.send(CONST.ERROR,{
@@ -90,14 +93,26 @@ ipcMain.on(CONST.UPDATE_TODO_TASK_ITEM,(evt, args)=>{
     var {_id, todo} = args,
         item = actions.getItem(_id);
     if(item){
-        tasks = item.tasks.map(( task )=>{ return task._key != todo._key? task:todo;   })
-        actions.prepareUpdateTask({_id},{tasks})        
+        var finished = 0;
+        tasks = item.tasks.map(( task )=>{
+            var reTask = task._key != todo._key? task:todo;
+            if(reTask.finished){
+                finished++;
+            }
+            return reTask
+        })
+        actions.prepareUpdateTask({_id},{tasks, finished, completed:(finished == tasks.length)})
             .then(function(updated){
                 if(!updated){
                     throw updated
                 }
-                actions.updateTaskList(_id,{tasks})
-                evt.sender.send(CONST.UPDATE_TODO_TASK_ITEM,{key:todo._key, todo});
+                actions.updateTaskList(_id,{
+                    tasks,
+                    completed:(finished == tasks.length),
+                    finished:finished
+                });
+                var item = actions.getItem(_id);
+                evt.sender.send(CONST.UPDATE_TODO_TASK_ITEM,{key:todo._key, todo, item});
             })
             .catch((err)=>{
                 evt.sender.send(CONST.ERROR,{
@@ -108,18 +123,28 @@ ipcMain.on(CONST.UPDATE_TODO_TASK_ITEM,(evt, args)=>{
     }
 })
 
+ipcMain.on(CONST.GET_TODO_TASK_ITEMS, (evt, args)=>{
+    const item = actions.getItem(args._id);
+    if(item){        
+        evt.sender.send(CONST.GET_TODO_TASK_ITEMS,{item});
+    }
+});
+
 ipcMain.on(CONST.REMOVE_TODO_TASK_ITEM, (evt, args)=>{
     var {_id, todo} = args,
         item = actions.getItem(_id);
     if(item){
         tasks = item.tasks.filter(( task )=>{ return task._key != todo._key; })
-        actions.prepareUpdateTask({_id},{tasks})        
+        var finished = 0;
+        tasks.filter((item)=>{return item.finished}).length;
+        actions.prepareUpdateTask({_id},{tasks, finished,  completed:(tasks.length == finished) })
             .then(function(updated){
                 if(!updated){
                     throw updated
                 }
                 actions.updateTaskList(_id,{tasks})
-                evt.sender.send(CONST.REMOVE_TODO_TASK_ITEM,{ key:todo._key });
+                var item = actions.getItem(_id);
+                evt.sender.send(CONST.REMOVE_TODO_TASK_ITEM,{key:todo._key, item});
             })
             .catch((err)=>{
                 evt.sender.send(CONST.ERROR,{

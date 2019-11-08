@@ -59,18 +59,24 @@
             </div> -->
         </div>
     </div>
+    <div class="absolute bottom-1 hidden">
+        <div class='w-1/4 bg-white shadow-xl rounded-lg  flex flex-col' id='messagesArea'>
+            
+        </div>
+    </div>
 </body>
 <script src='./public/js/geDOM.js'></script>
 <script src="./public/js/transition.js"></script>
 <script>
-    (function(w, $){        
+    (function(w, $){
     let activeList,
         activeIndex,
         menuDisplay=false,
         menuSelected = 0;
-    const        
+    const
         {ipcRenderer} = require('electron'),
         CONST = require('./backend/constants')
+       
 
         ipcRenderer.on(CONST.SET_TASK_LIST, (e, taskList)=>{
             var fragment = document.createDocumentFragment(),
@@ -105,13 +111,17 @@
         });       
 
         ipcRenderer.on(CONST.ERROR, (e, args)=>{
-            alert("ocurrió un error, es necesario revisar :v");
+            showMessage(geDom.draw({
+                "tag":"span",
+                "content":"e.message"
+            }));
         });
 
         ipcRenderer.on(CONST.ADD_TODO_TASK_ITEM,(e, args)=>{
             var nvoTodo = drawTaskTodoItem(args.todo);
                 document.querySelector("#listcontainer>ul").appendChild(nvoTodo);
-            activeList.tasks.push(args.todo);
+            activeList.tasks.push(args.todo);            
+            updateTaskItem(args.item);
         })
 
         ipcRenderer.on(CONST.REMOVE_TODO_TASK_ITEM, (e, args)=>{
@@ -120,7 +130,8 @@
                 "transform scale(1) scale(0) .45s"
             ],{
                 onTransitionEnd:()=>{
-                    element.remove();                    
+                    element.remove();   
+                    updateTaskItem(args.item);                 
                 }
             })
         })
@@ -129,8 +140,20 @@
             var nvoTask = drawTaskTodoItem(args.todo),
             elmnt = document.querySelector(`#listcontainer>ul li[data-id='${args.key}']`);
             elmnt.parentElement.replaceChild(nvoTask, elmnt);
+            updateTaskItem(args.item);
         })
 
+        ipcRenderer.on(CONST.GET_TODO_TASK_ITEMS, (e, {item})=>{            
+            toogleViewTaskTodo();
+            activeList = item;            
+            document.querySelector("#taskListName").innerText = item.name;
+            drawTaskTodos(item);
+           
+        })
+
+        ipcRenderer.on(CONST.APP_UPDATE_AVALIABLE, ()=>{
+
+        })
     //Eventos de la lista de pendientes
     function handleOnTaskMouseDown(evt){
         var taskItem = evt.target;
@@ -202,10 +225,7 @@
 
     function handleOnTaskDetailsClick(item, evt){
         evt.stopPropagation();
-        toogleViewTaskTodo();
-        activeList = item;            
-        document.querySelector("#taskListName").innerText = item.name;
-        drawTaskTodos(item)
+        ipcRenderer.send(CONST.GET_TODO_TASK_ITEMS,{ _id:item._id })       
     }
 
     function handleOnTodoClick(_key, evt){
@@ -230,6 +250,11 @@
         ipcRenderer.send(CONST.READY);            
     }
 
+    function updateTaskItem(item){
+        var nvoE = drawTaskListItem(item),
+            antElemtn = document.querySelector("#cardscontainer [data-index='"+item._id+"']");
+        antElemtn.parentElement.replaceChild(nvoE, antElemtn);
+    }
 
     function toogleHiddenMenu(){
         var element = document.querySelector("#bottomMenu"),
@@ -260,6 +285,14 @@
         }});
     }
 
+    window.showm = function showMessage(content){
+        var messageContainer = document.querySelector("#messagesArea"),
+            hidden = messageContainer.parentElement;;        
+        messageContainer.appendChild(content);
+        transition.begin(hidden,[
+            "transform scale(0) scale(1)"            
+        ]);
+    }
     
     function addTaskList(){
         ipcRenderer.send(CONST.ADD_TASK_LIST_ITEM);                    
@@ -280,13 +313,7 @@
             toogleHiddenMenu();
         }
     }
-
-    // function updateTaskList(todos){
-    //     w.localStorage.setItem(STORAGE, JSON.stringify(todos));            
-    // }
-
-
-    
+       
     //DIBUJO DE ELEMENTOS
     function drawTaskListFull(taskList) {
         var fragment = document.createDocumentFragment(),
@@ -317,11 +344,22 @@
                         {trigger:"input","action":evt=>handleOnTaskTitleInput(evt) }
                     ]                       
                 },
-                {tag:"a",attrs:{href:"#"},class:"self-end details",
-                    content:{
-                        tag:"span",attrs:{"data-icon":"dashicons:arrow-right"},class:"iconify text-lg"
-                    },
-                    evt:{trigger:"click", "action":evt=>{handleOnTaskDetailsClick(item, evt)} }
+                {
+                    tag:"div",class:"flex flex-row justify-between",content:[
+                        function(){
+                            return item.tasks.length >0 && {
+                                tag:"span", 
+                                class:`text-${item.completed?"green":"orange"}-400`, 
+                                content:`${item.finished || 0}/${item.tasks.length}`
+                            }
+                        },
+                        {tag:"a",attrs:{href:"#"},class:"self-end details",
+                            content:{
+                                tag:"span",attrs:{"data-icon":"dashicons:arrow-right"},class:"iconify text-lg"
+                            },
+                            evt:{trigger:"click", "action":evt=>{handleOnTaskDetailsClick(item, evt)} }
+                        }
+                    ]
                 }
             ]
         });
@@ -331,6 +369,7 @@
         return geDom.draw({
             tag:"li",
             attrs:{"data-id":todo._key},
+            class:"hover:bg-gray-200 p-1 rounded-sm",
             content:{
                 tag:"label",
                 class:`font-bold ${todo.finished && 'line-through text-teal-600'}`,

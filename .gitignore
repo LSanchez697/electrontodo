@@ -4,15 +4,12 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-<<<<<<< HEAD
 tailwind.config.js
 dist
 
 electron-builder.yml
 
 storage/database/db.dat
-=======
->>>>>>> 2ea70845018eba74ae85b438d11c698c2a65c89f
 
 # Runtime data
 pids
@@ -72,3 +69,6 @@ typings/
 =======
 .next
 >>>>>>> 2ea70845018eba74ae85b438d11c698c2a65c89f
+electron-builder.env
+backend/storage/db.dat
+backend/storage/db.dat

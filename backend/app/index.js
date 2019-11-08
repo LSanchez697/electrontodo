@@ -1,12 +1,15 @@
-'use strict'
 const {app, BrowserWindow} = require("electron")
 const url = require("url")
 const path  = require("path")
-require('./backend/emmiters/backend');
-const updater = require("./backend/app/autoupdate")
-let win 
+const updater = require("./autoupdate")
 
-const createWindow = ()=>{       
+require('../emmiters/backend');
+
+let win;
+    
+
+const createWindow = ()=>{   
+
     win = new BrowserWindow({
         width:380, 
         height:620,        
@@ -21,7 +24,7 @@ const createWindow = ()=>{
     win.setMenuBarVisibility(false);    
    
     win.loadURL(url.format({
-        pathname:path.join(__dirname,"index.html"),
+        pathname:path.join(__dirname,"../../index.html"),
         protocol:"file",
         slashes:1
     }));    
@@ -30,7 +33,7 @@ const createWindow = ()=>{
         win = null;
     });
     
-    win.webContents.openDevTools()
+    win.webContents.openDevTools();
     updater.startUpdatesChecker(win.webContents);
 }
 
@@ -47,3 +50,5 @@ app.on("activate",()=>{
 })
 
 app.on("ready", createWindow);
+
+module.exports = {app};
